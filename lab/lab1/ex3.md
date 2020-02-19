@@ -17,9 +17,9 @@
 ```
 预先定义常量，分别是内核代码段选择子和内核数据段选择子，以及稍后用于打开cr0 PE位开启保护模式的常量
 
-关于段选择子中每个bit的意义可以参考《Understanding the Linux Kernel》第二章或者《x86汇编语言：从实模式到保护模式》的第十一章
+关于段选择子中每个bit的意义可以参考《Understanding Linux Kernel》第二章或者《x86汇编语言：从实模式到保护模式》的第十一章
 
-关于linux中段的情况，比如内核（用户）代码、数据段的设置，可以参考《Understanding the Linux Kernel》的第二章
+关于linux中段的情况，比如内核（用户）代码、数据段的设置，可以参考《Understanding Linux Kernel》的第二章
 ```
 .globl start
 start:
@@ -110,7 +110,7 @@ protcseg:
   movw    %ax, %gs                # -> GS
   movw    %ax, %ss                # -> SS: Stack Segment
 ```
-在开启保护模式后，内存地址访问时使用的段寄存器含义也要做相应的改变，这里对段寄存器进行初始化。可以看到，这几个数据相关的段寄存器全部被初始化为了内核的数据段选择子，关于为什么相同，可以参考《Understanding the Linux Kernel》第二章，Linux内核所有数据相关的段都是公用一个，因此段选择子都是相同的。
+在开启保护模式后，内存地址访问时使用的段寄存器含义也要做相应的改变，这里对段寄存器进行初始化。可以看到，这几个数据相关的段寄存器全部被初始化为了内核的数据段选择子，关于为什么相同，可以参考《Understanding Linux Kernel》第二章，Linux内核所有数据相关的段都是公用一个，因此段选择子都是相同的。
 ```
   # Set up the stack pointer and call into C.
   movl    $start, %esp
@@ -205,7 +205,34 @@ ph是找到program headers起始处相对于elf header起始处的偏移再与�
 # Answer
 1. ljmp指令后；设置cr0寄存器；
 2. bootloder最后的指令是初始化栈指针，kernel的第一条指令是movw $0x1234,0x472，是内核entry.S的第一条指令
-3. 0x10000c，1M地址后刚开始处（见entry.S）
+3. 0x10000c，1M地址后刚开始处，这个可以通过做实验看出来（ps：一开始支这个地方我搞错了，做到后面才反应过来自己的理解有问题）
+先看看这句函数指针调用的反汇编（boot.asm）:
+    ```
+    for (; ph < eph; ph++)
+        7d66:	83 c4 0c             	add    $0xc,%esp
+        7d69:	eb e6                	jmp    7d51 <bootmain+0x3c>
+	((void (*)(void)) (ELFHDR->e_entry))();
+        7d6b:	ff 15 18 00 01 00    	call   *0x10018
+    ```
+    注意这里，不是写的call 0x10000c而是call *0x10018，也就是说先对0x10018解引用，再把那里的值作为跳转地址，我们调试一下看看：
+    ```
+    (gdb) b *0x7d6b
+    Breakpoint 1 at 0x7d6b
+    (gdb) c
+    Continuing.
+    The target architecture is assumed to be i386
+    => 0x7d6b:	call   *0x10018
+
+    Breakpoint 1, 0x00007d6b in ?? ()
+    (gdb) x/10x 0x10018
+    0x10018:	0x0010000c	0x00000034	0x00015364	0x00000000
+    0x10028:	0x00200034	0x00280003	0x000e000f	0x00000001
+    0x10038:	0x00001000	0xf0100000
+    (gdb) si 1
+    => 0x10000c:	movw   $0x1234,0x472
+    0x0010000c in ?? ()
+    ```
+    嗯，就是这样
 4. elf文件头的大小是预先设定好的八个扇区，后续程序段个数、大小是根据elf头中的信息得到的
 
 
