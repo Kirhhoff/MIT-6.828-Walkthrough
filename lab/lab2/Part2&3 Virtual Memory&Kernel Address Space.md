@@ -270,6 +270,7 @@ for(n=0;n<KERNSIZE;n+=PTSIZE)
 初始化KERNBASE以上同理
 
 至此，内核物理地址初始化完成
+
 ```
 Physical memory: 131072K available, base = 640K, extended = 130432K
 check_page_free_list() succeeded!
@@ -280,3 +281,41 @@ check_page_free_list() succeeded!
 check_page_installed_pgdir() succeeded!
 Welcome to the JOS kernel monitor!
 ```
+### Question
+- What entries (rows) in the page directory have been filled in at this point? What addresses do they map and where do they point? In other words, fill out this table as much as possible:
+
+| Entry | Base Virtual Address |                                             Points to (logically)                                             |
+| :---: | :------------------: | :-----------------------------------------------------------------------------------------------------------: |
+| 1023  |      0xffc00000      |                        page table for 1024th(last) 4MB virtual memory of kernerl sapce                        |
+| 1022  |      0xff800000      |                           page table for 1023th 4MB virtual memory of kernerl sapce                           |
+|   .   |          .           |                                                       .                                                       |
+|   .   |          .           |                                                       .                                                       |
+|  961  |      0xf0400000      |                            page table for 2nd 4MB virtual memory of kernerl sapce                             |
+|  960  |      0xf0000000      |                            page table for 1st 4MB virtual memory of kernerl sapce                             |
+|  959  |      0xefc00000      | page table for the area including  kernel stacks and invalid memory chunks(buffer  in case of stack overflow) |
+|  958  |      0xef800000      |                                             page directory itself                                             |
+|  957  |      0xef400000      |          page table for read-only user environment pages(physical page allocation information) image          |
+|  956  |      0xef000000      |                                                       ?                                                       |
+|   .   |          .           |                                                       .                                                       |
+|   .   |          .           |                                                       .                                                       |
+|   2   |      0x00c00000      |                                                       ?                                                       |
+|   1   |      0x00400000      |                                                       ?                                                       |
+|   0   |      0x00000000      |                                                       ?                                                       |
+
+- We have placed the kernel and user environment in the same address space. Why will user programs not be able to read or write the kernel's memory? What specific mechanisms protect the kernel memory?
+
+用户程序不能访问内核内存区域主要是为了保证计算机正常运行，有必要访问内核的时候全部系统调用，由内核态代为执行。保护机制主要是页表/页目录中的标志位，MMU会检查标志位，非法访问被禁止
+- What is the maximum amount of physical memory that this operating system can support? Why?
+
+这里很明显就是4GB了（如果hole区域也算进来的话），这是由page directory和page table，page的大小共同决定的
+- How much space overhead is there for managing memory, if we actually had the maximum amount of physical memory? How is this overhead broken down?
+
+overhead可以分以下这些来考虑：
+1. 物理页管理，Pageinfo一个8字节，满内存的话1M个页，overhead=8MB
+2. 页目录开销，一个项4字节，不管满没满内存都需要1K个项，overhead=4KB
+3. 页表开销，这个主要取决于你现在程序消耗了多少内存，而且是否是连续的内存地址消耗（不连续的话要多开页表），假如全部页表都被开出来，那就是1K个页表，每个页表4KB，overhead=4MB
+
+因此最大的overhead是8MB+4KB+4MB=12292KB，可以broken down为上述三部分
+- Revisit the page table setup in kern/entry.S and kern/entrypgdir.c. Immediately after we turn on paging, EIP is still a low number (a little over 1MB). At what point do we transition to running at an EIP above KERNBASE? What makes it possible for us to continue executing at a low EIP between when we enable paging and when we begin running at an EIP above KERNBASE? Why is this transition necessary?
+
+第一个问题之前已经说过了，是在jmp $relocated之后EIP进入高地址，之所以EIP低地址也可以访问是因为hard code的映射把间隔0xf0000000的高低地址都映射到相同物理内存，因此是可以正常运行的。而这个转换是为了后面进入C语言代码做准备，到那时所有内存访问都是通过虚拟地址。
