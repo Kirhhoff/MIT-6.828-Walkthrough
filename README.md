@@ -10,3 +10,5 @@ Timeline
 2020.2.21 完成lab2 Part 2&3 不包括challenge部分
 
 2020.2.22-24 完成lab2 challenge 1&2&4
+
+2020.2.25-2020.3.2 完成lab3 以及challenge 1&3
