@@ -51,6 +51,7 @@ void put(int key, int value)
 ```
 这里注意一定要在调用insert前锁住，因为这时访问了table[i]，而这个量恰恰是要锁住的
 得到结果：
+
 双线程：
 ```
 1: put time = 0.020500
